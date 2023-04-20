@@ -1,0 +1,117 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.UI;
+using System.Web.UI.WebControls;
+using System.Data.SqlClient;
+using System.Configuration;
+
+namespace LibraryManagementSystem
+{
+    public partial class Default : System.Web.UI.Page
+    {
+        protected void Page_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        protected void AddBook_Click(object sender, EventArgs e)
+        {
+            string title = Title.Text;
+            string author = Author.Text;
+            string publisher = Publisher.Text;
+            string genre = Genre.Text;
+            string isbn = ISBN.Text;
+            int copies = int.Parse(Copies.Text);
+
+            string connectionString = ConfigurationManager.ConnectionStrings["LibraryManagementSystemConnectionString"].ConnectionString;
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                string query = "INSERT INTO Books (Title, Author, Publisher, Genre, ISBN, Copies) VALUES (@Title, @Author, @Publisher, @Genre, @ISBN, @Copies)";
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@Title", title);
+                    command.Parameters.AddWithValue("@Author", author);
+                    command.Parameters.AddWithValue("@Publisher", publisher);
+                    command.Parameters.AddWithValue("@Genre", genre);
+                    command.Parameters.AddWithValue("@ISBN", isbn);
+                    command.Parameters.AddWithValue("@Copies", copies);
+
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                }
+            }
+
+            Response.Redirect(Request.Url.AbsoluteUri);
+        }
+
+        protected void RemoveBook_Click(object sender, EventArgs e)
+        {
+            string isbn = RemoveISBN.Text;
+
+            string connectionString = ConfigurationManager.ConnectionStrings["LibraryManagementSystemConnectionString"].ConnectionString;
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                string query = "DELETE FROM Books WHERE ISBN=@ISBN";
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@ISBN", isbn);
+
+                    connection.Open();
+                    command.ExecuteNonQuery();
+                }
+            }
+
+            Response.Redirect(Request.Url.AbsoluteUri);
+        }
+
+        protected void SearchBooks_Click(object sender, EventArgs e)
+        {
+            string searchTerm = SearchTerm.Text;
+            string searchBy = SearchBy.SelectedValue;
+
+            string connectionString = ConfigurationManager.ConnectionStrings["LibraryManagementSystemConnectionString"].ConnectionString;
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                string query = "SELECT * FROM Books WHERE " + searchBy + " LIKE '%" + searchTerm + "%'";
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    connection.Open();
+                    SqlDataReader reader = command.ExecuteReader();
+                    SearchResults.DataSource = reader;
+                    SearchResults.DataBind();
+                }
+            }
+        }
+
+        protected void CheckoutBook_Click(object sender, EventArgs e)
+        {
+            string isbn = CheckoutISBN.Text;
+            string name = CheckoutName.Text;
+
+            string connectionString = ConfigurationManager.ConnectionStrings["LibraryManagementSystemConnectionString"].ConnectionString;
+            using (SqlConnection connection = new SqlConnection(connectionString))
+            {
+                string query = "SELECT Copies FROM Books WHERE ISBN=@ISBN";
+                using (SqlCommand command = new SqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@ISBN", isbn);
+
+                    connection.Open();
+                    int copies = (int)command.ExecuteScalar();
+
+                    if (copies > 0)
+                    {
+                        query = "UPDATE Books SET Copies=@Copies WHERE ISBN=@ISBN";
+                        using (SqlCommand updateCommand = new SqlCommand(query, connection))
+                        {
+                            updateCommand.Parameters.AddWithValue("@Copies", copies - 1);
+                            updateCommand.Parameters.AddWithValue("@ISBN", isbn);
+                            updateCommand.ExecuteNonQuery();
+                        }
+
+                        query = "INSERT INTO Checkouts (ISBN, Name, CheckoutDate) VALUES (@ISBN, @Name, @CheckoutDate)";
+                        using (SqlCommand insertCommand = new SqlCommand(query, connection))
+                        {
+                            insertCommand.Parameters.AddWithValue("@ISBN",
